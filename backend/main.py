@@ -16,6 +16,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+def read_root():
+    return {
+        "status": "CEREBRO Engine Online", 
+        "version": "4.2.1",
+        "documentation": "/docs"
+    }
+
 @app.post("/analyze")
 async def analyze_graph(file: UploadFile = File(...)):
     try:

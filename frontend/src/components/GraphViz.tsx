@@ -340,14 +340,15 @@ export default function GraphViz({ suspicious_accounts, edgeData }: GraphVizProp
                 <ForceGraph2D
                     ref={graphRef}
                     graphData={graphData}
-                    backgroundColor="rgba(3, 7, 18, 1)"
+                    backgroundColor="rgba(0,0,0,0)"
                     nodeId="id"
                     nodeCanvasObject={paintNode}
                     nodeColor={(node: any) => suspiciousMap.has(node.id) ? '#ef4444' : '#6b7280'}
-                    nodeVal={(node: any) => suspiciousMap.has(node.id) ? 6 : 4}
+                    nodeVal={(node: any) => suspiciousMap.has(node.id) ? 8 : 5}
+                    nodeRelSize={5}
                     nodeLabel={(node: any) => suspiciousMap.has(node.id) ? `${node.id} | Score: ${suspiciousMap.get(node.id)} ⚠️` : node.id}
                     nodePointerAreaPaint={(node: any, color: string, ctx: CanvasRenderingContext2D) => {
-                        const radius = suspiciousMap.has(node.id) ? 10 : 7;
+                        const radius = suspiciousMap.has(node.id) ? 12 : 8;
                         ctx.beginPath();
                         ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
                         ctx.fillStyle = color;
@@ -355,6 +356,10 @@ export default function GraphViz({ suspicious_accounts, edgeData }: GraphVizProp
                     }}
                     enableNodeDrag={true}
                     linkCanvasObject={paintLink}
+                    linkDirectionalParticles={2}
+                    linkDirectionalParticleSpeed={0.005}
+                    linkDirectionalParticleWidth={2}
+                    linkDirectionalParticleColor={() => '#ef4444'}
                     onNodeHover={(node: any) => setHoveredNode(node ? node.id : null)}
                     onNodeClick={handleNodeClick}
                     onBackgroundClick={() => {
