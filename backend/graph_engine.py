@@ -58,7 +58,7 @@ class GraphEngine:
         try:
             # simple_cycles can be expensive, but required by spec.
             # In a real production environment with massive graphs, we might optimize this.
-            cycles = list(nx.simple_cycles(self.G))
+            cycles = list(nx.simple_cycles(self.G, length_bound=5))
             cycle_id_counter = 1
             
             for cycle in cycles:
@@ -83,26 +83,45 @@ class GraphEngine:
     def detect_temporal_smurfing(self):
         """
         Pattern B: Temporal Smurfing.
-        Fan-out: 1 node -> >= 10 distinct nodes. Recievers must have out_degree > 0.
-        Fan-in: >= 10 distinct nodes -> 1 node. Receiver must have out_degree == 1.
+        Fan-out: 1 node -> >= 10 transactions within a rolling 72-hour window. Receivers must have out_degree > 0.
+        Fan-in: >= 10 transactions -> 1 node within a rolling 72-hour window. Receiver must have out_degree == 1.
         """
+        WINDOW_SECONDS = 259200  # 72 hours
+
         # Fan-out
         for node in self.G.nodes():
-            successors = list(self.G.successors(node))
-            if len(set(successors)) >= 10:
+            out_edges = list(self.G.out_edges(node, data=True))
+            if len(out_edges) < 10:
+                continue
+            out_edges.sort(key=lambda e: pd.to_datetime(e[2].get('timestamp', '')))
+            timestamps = [pd.to_datetime(e[2].get('timestamp', '')) for e in out_edges]
+            found = False
+            for i in range(len(timestamps) - 9):
+                diff = (timestamps[i + 9] - timestamps[i]).total_seconds()
+                if diff <= WINDOW_SECONDS:
+                    found = True
+                    break
+            if found:
                 # False Positive Check: Receivers have out_degree > 0
-                valid_smurfing = True
-                for receiver in successors:
-                    if self.G.out_degree(receiver) == 0:
-                        valid_smurfing = False
-                        break
+                receivers = [e[1] for e in out_edges]
+                valid_smurfing = all(self.G.out_degree(r) > 0 for r in receivers)
                 if valid_smurfing:
                     self._flag_account(node, "fan_out_smurfing", 30)
 
         # Fan-in
         for node in self.G.nodes():
-            predecessors = list(self.G.predecessors(node))
-            if len(set(predecessors)) >= 10:
+            in_edges = list(self.G.in_edges(node, data=True))
+            if len(in_edges) < 10:
+                continue
+            in_edges.sort(key=lambda e: pd.to_datetime(e[2].get('timestamp', '')))
+            timestamps = [pd.to_datetime(e[2].get('timestamp', '')) for e in in_edges]
+            found = False
+            for i in range(len(timestamps) - 9):
+                diff = (timestamps[i + 9] - timestamps[i]).total_seconds()
+                if diff <= WINDOW_SECONDS:
+                    found = True
+                    break
+            if found:
                 # False Positive Check: Receiver has out_degree == 1
                 if self.G.out_degree(node) == 1:
                     self._flag_account(node, "fan_in_smurfing", 30)
